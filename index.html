@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HTML5 PPT Viewer（MAI 主题）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="toolbar">
+        <button id="btn-prev">◀︎ 上一页</button>
+        <span id="page-info">0 / 0</span>
+        <button id="btn-next">下一页 ▶︎</button>
+        <button id="btn-fullscreen">全屏</button>
+      </div>
+
+      <div id="slide-container">
+        <!-- JS 会在这里插入 slide-wrapper 和每一页 -->
+      </div>
+    </div>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
