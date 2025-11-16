@@ -5,7 +5,7 @@ let currentIndex = 0;
 
 // 本地开发：后端跑在 127.0.0.1:8001
 // 部署到云上后，把这里改成你的后端公网地址
-const API_BASE = "http://127.0.0.1:8001";
+const API_BASE = "https://aistoryteller-backend.onrender.com";
 
 // ========= 主题加载 =========
 
