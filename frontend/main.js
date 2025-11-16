@@ -1,212 +1,254 @@
-// ====== 配置区 ======
+// ========= 全局状态 =========
+let templateData = null;
+let slidesData = [];
+let currentIndex = 0;
 
-// 后端 API 地址：改成你在 Render 上的实际地址
-// 例如：https://aistory-backend.onrender.com
-const API_BASE = "https://aistory-backend.onrender.com";
+// 本地开发：后端跑在 127.0.0.1:8001
+// 部署到云上后，把这里改成你的后端公网地址
+const API_BASE = "https://aistoryteller-backend.onrender.com";
 
-// ====== DOM 获取 ======
+// ========= 主题加载 =========
 
-const fileInput = document.getElementById("ppt-file-input");
-const uploadBtn = document.getElementById("uploadBtn");
-const statusEl = document.getElementById("status");
-const slidesContainer = document.getElementById("slidesContainer");
-
-// 安全检查：防止 id 对不上时报错
-if (!fileInput || !uploadBtn || !statusEl || !slidesContainer) {
-  console.error(
-    "[AIStoryteller] 请确认 HTML 中存在以下元素：#pptFile, #uploadBtn, #status, #slidesContainer"
-  );
-}
-
-// ====== 工具函数 ======
-
-function setStatus(message, type = "info") {
-  if (!statusEl) return;
-  statusEl.textContent = message;
-  statusEl.className = "";
-  statusEl.classList.add("status", `status-${type}`);
-}
-
-function clearSlides() {
-  if (!slidesContainer) return;
-  slidesContainer.innerHTML = "";
-}
-
-function humanReadableSlideType(slideType) {
-  if (!slideType) return "UNKNOWN";
-
-  // 后端返回的是小写：title / agenda / content_bullets ...
-  const map = {
-    title: "TITLE",
-    agenda: "AGENDA",
-    section: "SECTION",
-    content: "CONTENT",
-    content_bullets: "CONTENT_BULLETS",
-    content_image: "CONTENT_IMAGE",
-    ending: "ENDING",
-    other: "OTHER",
-  };
-
-  const key = String(slideType).toLowerCase();
-  return map[key] || slideType.toUpperCase();
-}
-
-function truncate(text, maxLen = 80) {
-  if (!text) return "";
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen) + "…";
-}
-
-// ====== 渲染逻辑：把后端返回的数据画到页面上 ======
-
-function renderSlides(data) {
-  if (!slidesContainer) return;
-  clearSlides();
-
-  if (!data || !Array.isArray(data.slides) || data.slides.length === 0) {
-    setStatus("没有解析到任何页面。请检查 PPT 内容。", "warn");
-    return;
-  }
-
-  const { meta, slides } = data;
-
-  // 在顶部显示一个摘要
-  const summary = document.createElement("div");
-  summary.className = "slides-summary";
-  summary.innerHTML = `
-    <div>共 <strong>${slides.length}</strong> 页</div>
-    ${
-      meta
-        ? `<div class="slides-meta">尺寸（emu）：${meta.slide_width_emu} × ${meta.slide_height_emu}</div>`
-        : ""
+async function loadTheme() {
+  try {
+    const res = await fetch("./mai_theme_v1.json");
+    if (!res.ok) {
+      console.warn("无法加载主题 JSON，使用默认样式:", res.status);
+      return;
     }
-  `;
-  slidesContainer.appendChild(summary);
+    const theme = await res.json();
+    applyTheme(theme);
+  } catch (err) {
+    console.warn("加载主题 JSON 出错:", err);
+  }
+}
 
-  // 每一页生成一个 slide 卡片
+/**
+ * 把 mai_theme_v1.json 里的一些关键字段写到 CSS 变量里
+ * 你可以根据实际结构调整映射关系
+ */
+function applyTheme(theme) {
+  const root = document.documentElement;
+
+  if (theme.fontFamilySans) {
+    root.style.setProperty("--mai-font-family-sans", theme.fontFamilySans);
+  }
+  if (theme.colors) {
+    const c = theme.colors;
+    if (c.pageBg) root.style.setProperty("--mai-bg-page", c.pageBg);
+    if (c.panelBg) root.style.setProperty("--mai-bg-panel", c.panelBg);
+    if (c.cardBg) root.style.setProperty("--mai-bg-card", c.cardBg);
+    if (c.textMain) root.style.setProperty("--mai-text-main", c.textMain);
+    if (c.textMuted) root.style.setProperty("--mai-text-muted", c.textMuted);
+    if (c.accent) root.style.setProperty("--mai-accent", c.accent);
+  }
+}
+
+// ========= 数据结构辅助 =========
+
+/**
+ * 从后端返回的 JSON 里拿到 slides 数组
+ * 后端结构是 { meta, slides }；如果以后你还想支持 sample_slides，则可以在这里兼容。
+ */
+function getSlidesArray(data) {
+  if (data.slides && Array.isArray(data.slides)) {
+    return data.slides;
+  }
+  if (data.sample_slides && Array.isArray(data.sample_slides)) {
+    return data.sample_slides;
+  }
+  return [];
+}
+
+// ========= Slide 渲染 =========
+
+function createSlideElements(meta, slides) {
+  const slideContainer = document.getElementById("slide-container");
+  slideContainer.innerHTML = "";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "slide-wrapper";
+  slideContainer.appendChild(wrapper);
+
+  const slideWidthEmu = meta.slide_width_emu;
+  const slideHeightEmu = meta.slide_height_emu;
+
   slides.forEach((slide, idx) => {
     const slideEl = document.createElement("div");
     slideEl.className = "slide";
     slideEl.dataset.index = idx;
 
-    // 右上角 badge：显示 slide_type
+    // 可选：右上角一个小 badge 标出页面 index
     const badge = document.createElement("div");
     badge.className = "slide-type-badge";
-    const slideType = humanReadableSlideType(slide.slide_type);
-    badge.textContent = slideType;
+    badge.textContent = `Slide ${idx + 1}`;
     slideEl.appendChild(badge);
 
-    // 页码 + 布局名称
-    const header = document.createElement("div");
-    header.className = "slide-header";
-    header.innerHTML = `
-      <div class="slide-index">Slide ${idx + 1}</div>
-      <div class="slide-layout">${slide.layout_name || ""}</div>
-    `;
-    slideEl.appendChild(header);
-
-    // 主体内容：简单列出文本 shape（方便你 debug 类型）
-    const body = document.createElement("div");
-    body.className = "slide-body";
-
     const shapes = slide.shapes || [];
-    if (shapes.length === 0) {
-      const emptyHint = document.createElement("div");
-      emptyHint.className = "slide-empty";
-      emptyHint.textContent = "（这一页没有识别到可用元素）";
-      body.appendChild(emptyHint);
-    } else {
-      // 把有文本的 shape 简单列出来
-      const textShapes = shapes.filter(
-        (s) => s.has_text_frame && s.text && s.text.trim().length > 0
-      );
 
-      if (textShapes.length === 0) {
-        const noTextHint = document.createElement("div");
-        noTextHint.className = "slide-empty";
-        noTextHint.textContent = "（这一页没有文字内容）";
-        body.appendChild(noTextHint);
-      } else {
-        textShapes.forEach((shape) => {
-          const shapeEl = document.createElement("div");
-          shapeEl.className = "shape-text-block";
+    shapes.forEach((shape) => {
+      const geom = shape.geometry || {};
+      const left = geom.left_emu || 0;
+      const top = geom.top_emu || 0;
+      const width = geom.width_emu || 0;
+      const height = geom.height_emu || 0;
 
-          const metaLine = document.createElement("div");
-          metaLine.className = "shape-meta";
-          metaLine.textContent = `[${shape.shape_type}] ${shape.name || ""}`;
-          shapeEl.appendChild(metaLine);
+      const leftPct = (left / slideWidthEmu) * 100;
+      const topPct = (top / slideHeightEmu) * 100;
+      const widthPct = (width / slideWidthEmu) * 100;
+      const heightPct = (height / slideHeightEmu) * 100;
 
-          const textLine = document.createElement("div");
-          textLine.className = "shape-text";
-          textLine.textContent = truncate(shape.text, 160);
-          shapeEl.appendChild(textLine);
+      const shapeEl = document.createElement("div");
+      shapeEl.classList.add("shape");
 
-          body.appendChild(shapeEl);
-        });
+      const shapeType = (shape.shape_type || "").toUpperCase();
+
+      if (shapeType === "TEXT_BOX") {
+        shapeEl.classList.add("shape-text");
+      } else if (shapeType === "PICTURE" || shapeType === "MEDIA") {
+        shapeEl.classList.add("shape-picture");
+      } else if (shapeType === "LINE") {
+        shapeEl.classList.add("shape-line");
       }
-    }
 
-    slideEl.appendChild(body);
-    slidesContainer.appendChild(slideEl);
+      shapeEl.style.left = leftPct + "%";
+      shapeEl.style.top = topPct + "%";
+      shapeEl.style.width = widthPct + "%";
+      shapeEl.style.height = heightPct + "%";
+
+      if (shape.has_text_frame && shape.text) {
+        const text = shape.text;
+        shapeEl.textContent = text;
+
+        // 粗糙地猜一下是不是标题：在上 1/3 区域 + 字数不多
+        const yCenter = (top + height / 2) / slideHeightEmu;
+        const len = text.trim().length;
+        if (yCenter < 0.3 && len > 0 && len <= 40) {
+          shapeEl.classList.add("title-like");
+        }
+      }
+
+      slideEl.appendChild(shapeEl);
+    });
+
+    wrapper.appendChild(slideEl);
   });
 }
 
-// ====== 调用后端 API：上传 PPT 并解析 ======
+function showSlide(index) {
+  if (!slidesData.length) return;
 
-async function uploadAndParsePpt(file) {
-  if (!file) {
-    setStatus("请先选择一个 PPT 文件。", "warn");
-    return;
+  if (index < 0) index = 0;
+  if (index >= slidesData.length) index = slidesData.length - 1;
+
+  currentIndex = index;
+
+  const slides = document.querySelectorAll(".slide");
+  slides.forEach((s) => s.classList.remove("active"));
+
+  const active = document.querySelector(`.slide[data-index="${index}"]`);
+  if (active) {
+    active.classList.add("active");
   }
 
-  setStatus("正在上传并解析 PPT，请稍候…", "info");
-  clearSlides();
+  const pageInfo = document.getElementById("page-info");
+  pageInfo.textContent = `${index + 1} / ${slidesData.length}`;
+}
 
+// ========= 上传 & 调用后端 =========
+
+async function uploadAndRenderPpt(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  try {
-    const resp = await fetch(`${API_BASE}/api/parse_ppt`, {
-      method: "POST",
-      body: formData,
+  const res = await fetch(`${API_BASE}/api/parse_ppt`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("解析 PPT 失败: " + res.status + " " + text);
+  }
+
+  const data = await res.json();
+  console.log("后端解析 PPT 返回的数据:", data);
+
+  templateData = data;
+  slidesData = getSlidesArray(templateData);
+
+  if (!slidesData.length) {
+    document.getElementById("page-info").textContent = "0 / 0";
+    document.getElementById("slide-container").innerHTML = "";
+    return;
+  }
+
+  createSlideElements(templateData.meta, slidesData);
+  showSlide(0);
+}
+
+// ========= 控件绑定 & 全屏 =========
+
+function toggleFullscreen(element) {
+  if (!document.fullscreenElement) {
+    element.requestFullscreen().catch((err) => {
+      console.warn("无法进入全屏:", err);
     });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("API Error:", text);
-      setStatus(`解析失败（${resp.status}）：${text}`, "error");
-      return;
-    }
-
-    const data = await resp.json();
-    console.log("PPT parsed data:", data);
-
-    setStatus("解析成功 ✅ 下面是每一页的结构和类型。", "success");
-    renderSlides(data);
-  } catch (err) {
-    console.error(err);
-    setStatus("请求出错，可能是网络问题或后端服务异常。", "error");
+  } else {
+    document.exitFullscreen().catch((err) => {
+      console.warn("退出全屏失败:", err);
+    });
   }
 }
 
-// ====== 事件绑定 ======
+function bindControls() {
+  const btnPrev = document.getElementById("btn-prev");
+  const btnNext = document.getElementById("btn-next");
+  const btnFullscreen = document.getElementById("btn-fullscreen");
+  const app = document.getElementById("app");
+  const fileInput = document.getElementById("ppt-file-input");
 
-if (uploadBtn) {
-  uploadBtn.addEventListener("click", () => {
-    const file = fileInput && fileInput.files && fileInput.files[0];
-    uploadAndParsePpt(file);
+  btnPrev.addEventListener("click", () => showSlide(currentIndex - 1));
+  btnNext.addEventListener("click", () => showSlide(currentIndex + 1));
+  btnFullscreen.addEventListener("click", () => toggleFullscreen(app));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") {
+      showSlide(currentIndex - 1);
+    } else if (e.key === "ArrowRight") {
+      showSlide(currentIndex + 1);
+    } else if (e.key === "f" || e.key === "F") {
+      toggleFullscreen(app);
+    }
+  });
+
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      document.getElementById("page-info").textContent = "解析中...";
+      await uploadAndRenderPpt(file);
+    } catch (err) {
+      console.error(err);
+      alert(err.message);
+      document.getElementById("page-info").textContent = "0 / 0";
+    } finally {
+      fileInput.value = ""; // 方便再次选择同一个文件
+    }
   });
 }
 
-// 回车键快速触发上传（可选）
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const file = fileInput && fileInput.files && fileInput.files[0];
-    if (file) {
-      uploadAndParsePpt(file);
-    }
-  }
-});
+// ========= 初始化 =========
 
-// 初始状态
-setStatus("请上传一个 PPT 文件，系统会自动解析并标注每一页的类型。", "info");
+async function init() {
+  try {
+    await loadTheme();
+    bindControls();
+    document.getElementById("page-info").textContent = "0 / 0";
+  } catch (err) {
+    console.error("初始化失败:", err);
+    alert("初始化失败：" + err.message);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", init);
