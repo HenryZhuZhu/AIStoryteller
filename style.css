@@ -1,32 +1,83 @@
-* {
+:root {
+  /* 这部分可以和 mai_theme_v1.json 对应，由 JS 动态覆盖 */
+  --mai-font-family-sans: -apple-system, BlinkMacSystemFont, system-ui,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mai-bg-page: #fdf7ee;
+  --mai-bg-panel: #f5ece0;
+  --mai-bg-card: #eadac7;
+  --mai-text-main: #3b2b1e;
+  --mai-text-muted: #8a7a6a;
+  --mai-accent: #c46a2b;
+  --mai-border-subtle: rgba(0, 0, 0, 0.06);
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #111;
-  font-family: var(
-      --mai-font-body,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      sans-serif
-    );
-  color: var(--mai-text-primary, #eee);
+  padding: 0;
+  font-family: var(--mai-font-family-sans);
+  background: radial-gradient(circle at top left, #fbe8d0, #f6f0e7);
+  color: var(--mai-text-main);
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
 }
 
 #app {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  gap: 12px;
 }
 
-/* 工具条 */
+/* 顶部工具栏 */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(253, 247, 238, 0.9);
+  border-radius: 999px;
+  border: 1px solid var(--mai-border-subtle);
+  backdrop-filter: blur(10px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f4a261, #e76f51);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.brand-name {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mai-text-muted);
+}
+
 #toolbar {
-  flex: 0 0 auto;
-  padding: 8px 16px;
-  background: #222;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -34,93 +85,131 @@ body {
 }
 
 #toolbar button {
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: #444;
-  color: #eee;
   border: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #333;
+  color: #f8f8f8;
+  font-size: 13px;
   cursor: pointer;
 }
 
 #toolbar button:hover {
-  background: #666;
+  background: #555;
 }
 
 #page-info {
-  flex: 1;
+  min-width: 70px;
   text-align: center;
+  color: var(--mai-text-muted);
 }
 
-/* slide 区域：居中显示一个 16:9 的画布 */
-#slide-container {
-  flex: 1 1 auto;
-  display: flex;
-  justify-content: center;
+/* 上传 PPT 按钮样式 */
+#upload-label {
+  margin-left: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
-  background: #000;
-  overflow: hidden;
+  gap: 6px;
 }
 
-/* 16:9 画布，用你的 page 背景色 */
-.slide-wrapper {
-  position: relative;
-  width: 100vw;
-  max-width: 1600px;
+#upload-label span::before {
+  content: "⤴";
+  font-size: 12px;
+}
+
+#upload-label:hover {
+  background: #fff;
+}
+
+/* 主体区域：居中一个 16:9 slide 容器 */
+#main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#slide-container {
+  width: 100%;
+  max-width: 1280px;
   aspect-ratio: 16 / 9;
-  background: var(--mai-bg-page, #fef9ed);
-  overflow: hidden;
+  position: relative;
 }
 
-/* 每一页 slide */
+/* 包裹真正 slide 的 wrapper，用于相对定位 */
+.slide-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 单页 slide */
 .slide {
   position: absolute;
   inset: 0;
+  margin: 0 auto;
+  border-radius: 24px;
+  background: var(--mai-bg-page);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
   display: none;
-  background: var(--mai-bg-page, #fef9ed);
 }
 
-/* 当前页可见 */
 .slide.active {
   display: block;
 }
 
-/* 所有 shape 的基础样式 */
+/* 形状基础样式 */
 .shape {
   position: absolute;
   overflow: hidden;
-}
-
-/* 文本框 */
-.shape-text {
-  padding: 4px 6px;
-  color: var(--mai-text-primary, #72675b);
-  font-family: var(--mai-font-body, "Segoe UI", sans-serif);
-  font-size: var(--mai-font-size-body, 22px);
-  line-height: 1.3;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--mai-font-family-sans);
+  color: var(--mai-text-main);
 }
 
-/* 识别为标题时，增强一点 */
-.shape-text.title-like {
-  font-family: var(--mai-font-title, "Times New Roman", serif);
-  font-size: var(--mai-font-size-slide-title, 48px);
-  font-weight: 700;
-  color: var(--mai-text-strong, #3b230e);
+/* 文本形状 */
+.shape-text {
+  font-size: 18px;
+  line-height: 1.4;
 }
 
-/* 提示类文本（< Delete me! 等）弱化 */
-.shape-text.hint {
-  opacity: 0.4;
-  font-style: italic;
-  font-size: var(--mai-font-size-caption, 16px);
-}
-
-/* 图片类占位，先用纯色，后续你可以改成 <img> */
+/* 图片形状：目前先用一个占位的浅色块表示图片区域 */
 .shape-picture {
-  background: #555;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 18px;
 }
 
-/* 线条简单画成横线 */
+/* 线条：（简单画一条横线） */
 .shape-line {
-  border-bottom: 2px solid #888;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* 标题样式（根据位置 & 字数猜出来的） */
+.title-like {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+/* 调试：右上角显示类型标签（后面如果做类型识别可以用） */
+.slide-type-badge {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  pointer-events: none;
 }

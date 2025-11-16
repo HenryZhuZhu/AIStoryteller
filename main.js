@@ -1,122 +1,71 @@
-// 全局状态
+// ========= 全局状态 =========
 let templateData = null;
 let slidesData = [];
 let currentIndex = 0;
 
-/**
- * 加载 MAI 视觉主题 JSON，并写入 CSS 变量
- */
+// 本地开发：后端跑在 127.0.0.1:8001
+// 部署到云上后，把这里改成你的后端公网地址
+const API_BASE = "http://127.0.0.1:8001";
+
+// ========= 主题加载 =========
+
 async function loadTheme() {
-  const res = await fetch("./mai_theme_v1.json");
-  if (!res.ok) {
-    throw new Error("无法加载主题配置 mai_theme_v1.json");
+  try {
+    const res = await fetch("./mai_theme_v1.json");
+    if (!res.ok) {
+      console.warn("无法加载主题 JSON，使用默认样式:", res.status);
+      return;
+    }
+    const theme = await res.json();
+    applyTheme(theme);
+  } catch (err) {
+    console.warn("加载主题 JSON 出错:", err);
   }
-  const theme = await res.json();
-  applyThemeToCssVars(theme);
-  return theme;
-}
-
-function applyThemeToCssVars(theme) {
-  const root = document.documentElement;
-  const colors = theme.colors || {};
-  const fonts = theme.fonts || {};
-  const bodyFont = fonts.secondary?.name || "Segoe UI";
-  const titleFont = fonts.primary?.name || "Times New Roman";
-
-  // 背景色
-  root.style.setProperty(
-    "--mai-bg-page",
-    colors.backgrounds?.page || "#FEF9ED"
-  );
-  root.style.setProperty(
-    "--mai-bg-panel",
-    colors.backgrounds?.panel || "#F5ECE0"
-  );
-  root.style.setProperty(
-    "--mai-bg-card",
-    colors.backgrounds?.card || "#EADAC7"
-  );
-
-  // 文本色
-  root.style.setProperty(
-    "--mai-text-primary",
-    colors.text?.primary || "#72675B"
-  );
-  root.style.setProperty(
-    "--mai-text-secondary",
-    colors.text?.secondary || "#92877A"
-  );
-  root.style.setProperty(
-    "--mai-text-strong",
-    colors.text?.strong || "#3B230E"
-  );
-  root.style.setProperty(
-    "--mai-text-muted",
-    colors.text?.muted || "#B3A79A"
-  );
-
-  // 字体
-  root.style.setProperty(
-    "--mai-font-body",
-    `"${bodyFont}", ${fonts.secondary?.fallbacks?.join(", ") || "sans-serif"}`
-  );
-  root.style.setProperty(
-    "--mai-font-title",
-    `"${titleFont}", ${fonts.primary?.fallbacks?.join(", ") || "serif"}`
-  );
-
-  // 字号（px）
-  const sizes = fonts.recommended_sizes || {};
-  root.style.setProperty(
-    "--mai-font-size-title",
-    (sizes.title || 72) + "px"
-  );
-  root.style.setProperty(
-    "--mai-font-size-slide-title",
-    (sizes.slide_title || 48) + "px"
-  );
-  root.style.setProperty(
-    "--mai-font-size-heading",
-    (sizes.heading || 32) + "px"
-  );
-  root.style.setProperty(
-    "--mai-font-size-body",
-    (sizes.body || 22) + "px"
-  );
-  root.style.setProperty(
-    "--mai-font-size-caption",
-    (sizes.caption || 16) + "px"
-  );
 }
 
 /**
- * 加载模板结构 JSON
+ * 把 mai_theme_v1.json 里的一些关键字段写到 CSS 变量里
+ * 你可以根据实际结构调整映射关系
  */
-async function loadTemplateJson() {
-  const res = await fetch("./template_structure.json");
-  if (!res.ok) {
-    throw new Error("无法加载 template_structure.json");
+function applyTheme(theme) {
+  const root = document.documentElement;
+
+  if (theme.fontFamilySans) {
+    root.style.setProperty("--mai-font-family-sans", theme.fontFamilySans);
   }
-  const data = await res.json();
-  return data;
+  if (theme.colors) {
+    const c = theme.colors;
+    if (c.pageBg) root.style.setProperty("--mai-bg-page", c.pageBg);
+    if (c.panelBg) root.style.setProperty("--mai-bg-panel", c.panelBg);
+    if (c.cardBg) root.style.setProperty("--mai-bg-card", c.cardBg);
+    if (c.textMain) root.style.setProperty("--mai-text-main", c.textMain);
+    if (c.textMuted) root.style.setProperty("--mai-text-muted", c.textMuted);
+    if (c.accent) root.style.setProperty("--mai-accent", c.accent);
+  }
 }
 
+// ========= 数据结构辅助 =========
+
 /**
- * 有的版本是 data.slides，有的是 data.sample_slides
+ * 从后端返回的 JSON 里拿到 slides 数组
+ * 后端结构是 { meta, slides }；如果以后你还想支持 sample_slides，则可以在这里兼容。
  */
 function getSlidesArray(data) {
-  if (Array.isArray(data.slides)) return data.slides;
-  if (Array.isArray(data.sample_slides)) return data.sample_slides;
+  if (data.slides && Array.isArray(data.slides)) {
+    return data.slides;
+  }
+  if (data.sample_slides && Array.isArray(data.sample_slides)) {
+    return data.sample_slides;
+  }
   return [];
 }
 
-/**
- * 根据 JSON 渲染所有 slide
- */
+// ========= Slide 渲染 =========
+
 function createSlideElements(meta, slides) {
   const slideContainer = document.getElementById("slide-container");
+  slideContainer.innerHTML = "";
 
-  // 包一层 wrapper，保持 16:9 比例
   const wrapper = document.createElement("div");
   wrapper.className = "slide-wrapper";
   slideContainer.appendChild(wrapper);
@@ -129,6 +78,12 @@ function createSlideElements(meta, slides) {
     slideEl.className = "slide";
     slideEl.dataset.index = idx;
 
+    // 可选：右上角一个小 badge 标出页面 index
+    const badge = document.createElement("div");
+    badge.className = "slide-type-badge";
+    badge.textContent = `Slide ${idx + 1}`;
+    slideEl.appendChild(badge);
+
     const shapes = slide.shapes || [];
 
     shapes.forEach((shape) => {
@@ -138,7 +93,6 @@ function createSlideElements(meta, slides) {
       const width = geom.width_emu || 0;
       const height = geom.height_emu || 0;
 
-      // EMU -> 百分比，适配不同屏幕大小
       const leftPct = (left / slideWidthEmu) * 100;
       const topPct = (top / slideHeightEmu) * 100;
       const widthPct = (width / slideWidthEmu) * 100;
@@ -149,13 +103,9 @@ function createSlideElements(meta, slides) {
 
       const shapeType = (shape.shape_type || "").toUpperCase();
 
-      // 不同类型加不同 class
       if (shapeType === "TEXT_BOX") {
         shapeEl.classList.add("shape-text");
-      } else if (
-        shapeType === "PICTURE" ||
-        shapeType === "MEDIA"
-      ) {
+      } else if (shapeType === "PICTURE" || shapeType === "MEDIA") {
         shapeEl.classList.add("shape-picture");
       } else if (shapeType === "LINE") {
         shapeEl.classList.add("shape-line");
@@ -166,25 +116,15 @@ function createSlideElements(meta, slides) {
       shapeEl.style.width = widthPct + "%";
       shapeEl.style.height = heightPct + "%";
 
-      // 文本内容
       if (shape.has_text_frame && shape.text) {
         const text = shape.text;
         shapeEl.textContent = text;
 
-        // 简单 heuristics：短文本 + 上半部分 → 认为是标题
+        // 粗糙地猜一下是不是标题：在上 1/3 区域 + 字数不多
         const yCenter = (top + height / 2) / slideHeightEmu;
         const len = text.trim().length;
         if (yCenter < 0.3 && len > 0 && len <= 40) {
           shapeEl.classList.add("title-like");
-        }
-
-        // 提示类文字弱化
-        const lower = text.trim().toLowerCase();
-        if (
-          lower.includes("< delete me") ||
-          lower.includes("break lines need to be adjusted")
-        ) {
-          shapeEl.classList.add("hint");
         }
       }
 
@@ -195,39 +135,82 @@ function createSlideElements(meta, slides) {
   });
 }
 
-/**
- * 显示第 index 页
- */
 function showSlide(index) {
-  const wrapper = document.querySelector(".slide-wrapper");
-  if (!wrapper) return;
-
-  const slides = wrapper.querySelectorAll(".slide");
-  if (slides.length === 0) return;
+  if (!slidesData.length) return;
 
   if (index < 0) index = 0;
-  if (index >= slides.length) index = slides.length - 1;
+  if (index >= slidesData.length) index = slidesData.length - 1;
+
   currentIndex = index;
 
-  slides.forEach((slide, idx) => {
-    slide.classList.toggle("active", idx === currentIndex);
-  });
+  const slides = document.querySelectorAll(".slide");
+  slides.forEach((s) => s.classList.remove("active"));
+
+  const active = document.querySelector(`.slide[data-index="${index}"]`);
+  if (active) {
+    active.classList.add("active");
+  }
 
   const pageInfo = document.getElementById("page-info");
-  pageInfo.textContent = `${currentIndex + 1} / ${slides.length}`;
+  pageInfo.textContent = `${index + 1} / ${slidesData.length}`;
 }
 
-/**
- * 绑定按钮 & 键盘事件
- */
+// ========= 上传 & 调用后端 =========
+
+async function uploadAndRenderPpt(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/api/parse_ppt`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("解析 PPT 失败: " + res.status + " " + text);
+  }
+
+  const data = await res.json();
+  console.log("后端解析 PPT 返回的数据:", data);
+
+  templateData = data;
+  slidesData = getSlidesArray(templateData);
+
+  if (!slidesData.length) {
+    document.getElementById("page-info").textContent = "0 / 0";
+    document.getElementById("slide-container").innerHTML = "";
+    return;
+  }
+
+  createSlideElements(templateData.meta, slidesData);
+  showSlide(0);
+}
+
+// ========= 控件绑定 & 全屏 =========
+
+function toggleFullscreen(element) {
+  if (!document.fullscreenElement) {
+    element.requestFullscreen().catch((err) => {
+      console.warn("无法进入全屏:", err);
+    });
+  } else {
+    document.exitFullscreen().catch((err) => {
+      console.warn("退出全屏失败:", err);
+    });
+  }
+}
+
 function bindControls() {
   const btnPrev = document.getElementById("btn-prev");
   const btnNext = document.getElementById("btn-next");
   const btnFullscreen = document.getElementById("btn-fullscreen");
   const app = document.getElementById("app");
+  const fileInput = document.getElementById("ppt-file-input");
 
   btnPrev.addEventListener("click", () => showSlide(currentIndex - 1));
   btnNext.addEventListener("click", () => showSlide(currentIndex + 1));
+  btnFullscreen.addEventListener("click", () => toggleFullscreen(app));
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") {
@@ -239,46 +222,33 @@ function bindControls() {
     }
   });
 
-  btnFullscreen.addEventListener("click", () => toggleFullscreen(app));
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      document.getElementById("page-info").textContent = "解析中...";
+      await uploadAndRenderPpt(file);
+    } catch (err) {
+      console.error(err);
+      alert(err.message);
+      document.getElementById("page-info").textContent = "0 / 0";
+    } finally {
+      fileInput.value = ""; // 方便再次选择同一个文件
+    }
+  });
 }
 
-/**
- * 切换全屏
- */
-function toggleFullscreen(element) {
-  if (!document.fullscreenElement) {
-    if (element.requestFullscreen) {
-      element.requestFullscreen();
-    }
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    }
-  }
-}
+// ========= 初始化 =========
 
-/**
- * 初始化：先加载主题，再加载模板，再渲染
- */
 async function init() {
   try {
-    await loadTheme(); // 应用 MAI 主题
-
-    templateData = await loadTemplateJson();
-    slidesData = getSlidesArray(templateData);
-
-    if (!slidesData.length) {
-      alert("template_structure.json 中未找到 slides 或 sample_slides 数组");
-      return;
-    }
-
-    createSlideElements(templateData.meta, slidesData);
+    await loadTheme();
     bindControls();
-    showSlide(0);
+    document.getElementById("page-info").textContent = "0 / 0";
   } catch (err) {
-    console.error(err);
+    console.error("初始化失败:", err);
     alert("初始化失败：" + err.message);
   }
 }
 
-window.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", init);
