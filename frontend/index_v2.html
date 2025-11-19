@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AIStoryteller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <div class="brand">
+          <span class="brand-mark">AI</span>
+          <span class="brand-name">Storyteller</span>
+        </div>
+        <div id="toolbar">
+          <button id="btn-prev">◀︎ 上一页</button>
+          <span id="page-info">0 / 0</span>
+          <button id="btn-next">下一页 ▶︎</button>
+          <button id="btn-fullscreen">全屏</button>
+
+          <!-- 上传 PPT 按钮 -->
+          <label id="upload-label">
+            <input
+              id="ppt-file-input"
+              type="file"
+              accept=".ppt,.pptx"
+              hidden
+            />
+            <span>上传 PPT</span>
+          </label>
+
+          <!-- 下载按钮（美化后显示）-->
+          <button id="btn-download" style="display: none;">⬇️ 下载美化版</button>
+        </div>
+      </header>
+
+      <main id="main">
+        <div id="slide-container"></div>
+      </main>
+    </div>
+
+    <script src="main_v2.js"></script>
+  </body>
+</html>
