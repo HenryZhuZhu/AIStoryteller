@@ -264,11 +264,17 @@ function bindControls() {
     try {
       document.getElementById("page-info").textContent = "美化中...";
       
-      // 先美化 PPT
+      // 先美化 PPT，获取美化后的 blob
       await uploadAndBeautifyPpt(file);
       
-      // 然后解析并显示预览
-      await parseAndRenderPpt(file);
+      // 使用美化后的 blob 进行预览
+      if (beautifiedPptBlob) {
+        // 将 blob 转换为 File 对象
+        const beautifiedFile = new File([beautifiedPptBlob], file.name, {
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        await parseAndRenderPpt(beautifiedFile);
+      }
       
       document.getElementById("page-info").textContent = 
         `美化完成！${slidesData.length} 页`;
