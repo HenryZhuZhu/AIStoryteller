@@ -2,10 +2,10 @@
 let templateData = null;
 let slidesData = [];
 let currentIndex = 0;
+let beautifiedPptBlob = null; // 存储美化后的 PPT
 
-// 本地开发：后端跑在 127.0.0.1:8001
-// 部署到云上后，把这里改成你的后端公网地址
 const API_BASE = "https://aistoryteller-backend.onrender.com";
+// 本地测试: const API_BASE = "http://127.0.0.1:8001";
 
 // ========= 主题加载 =========
 
@@ -23,10 +23,6 @@ async function loadTheme() {
   }
 }
 
-/**
- * 把 mai_theme_v1.json 里的一些关键字段写到 CSS 变量里
- * 你可以根据实际结构调整映射关系
- */
 function applyTheme(theme) {
   const root = document.documentElement;
 
@@ -46,10 +42,6 @@ function applyTheme(theme) {
 
 // ========= 数据结构辅助 =========
 
-/**
- * 从后端返回的 JSON 里拿到 slides 数组
- * 后端结构是 { meta, slides }；如果以后你还想支持 sample_slides，则可以在这里兼容。
- */
 function getSlidesArray(data) {
   if (data.slides && Array.isArray(data.slides)) {
     return data.slides;
@@ -78,7 +70,6 @@ function createSlideElements(meta, slides) {
     slideEl.className = "slide";
     slideEl.dataset.index = idx;
 
-    // 可选：右上角一个小 badge 标出页面 index
     const badge = document.createElement("div");
     badge.className = "slide-type-badge";
     badge.textContent = `Slide ${idx + 1}`;
@@ -120,7 +111,6 @@ function createSlideElements(meta, slides) {
         const text = shape.text;
         shapeEl.textContent = text;
 
-        // 粗糙地猜一下是不是标题：在上 1/3 区域 + 字数不多
         const yCenter = (top + height / 2) / slideHeightEmu;
         const len = text.trim().length;
         if (yCenter < 0.3 && len > 0 && len <= 40) {
@@ -155,9 +145,36 @@ function showSlide(index) {
   pageInfo.textContent = `${index + 1} / ${slidesData.length}`;
 }
 
-// ========= 上传 & 调用后端 =========
+// ========= 上传 & 美化功能 =========
 
-async function uploadAndRenderPpt(file) {
+async function uploadAndBeautifyPpt(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // 调用美化 API
+  const res = await fetch(`${API_BASE}/api/beautify_ppt`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("美化 PPT 失败: " + res.status + " " + text);
+  }
+
+  // 获取美化后的文件
+  const blob = await res.blob();
+  beautifiedPptBlob = blob;
+
+  // 显示下载按钮
+  const downloadBtn = document.getElementById("btn-download");
+  downloadBtn.style.display = "inline-block";
+  downloadBtn.disabled = false;
+
+  return blob;
+}
+
+async function parseAndRenderPpt(file) {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -187,6 +204,22 @@ async function uploadAndRenderPpt(file) {
   showSlide(0);
 }
 
+function downloadBeautifiedPpt() {
+  if (!beautifiedPptBlob) {
+    alert("没有可下载的文件");
+    return;
+  }
+
+  const url = URL.createObjectURL(beautifiedPptBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "beautified_presentation.pptx";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ========= 控件绑定 & 全屏 =========
 
 function toggleFullscreen(element) {
@@ -205,12 +238,14 @@ function bindControls() {
   const btnPrev = document.getElementById("btn-prev");
   const btnNext = document.getElementById("btn-next");
   const btnFullscreen = document.getElementById("btn-fullscreen");
+  const btnDownload = document.getElementById("btn-download");
   const app = document.getElementById("app");
   const fileInput = document.getElementById("ppt-file-input");
 
   btnPrev.addEventListener("click", () => showSlide(currentIndex - 1));
   btnNext.addEventListener("click", () => showSlide(currentIndex + 1));
   btnFullscreen.addEventListener("click", () => toggleFullscreen(app));
+  btnDownload.addEventListener("click", downloadBeautifiedPpt);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") {
@@ -225,15 +260,31 @@ function bindControls() {
   fileInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     try {
-      document.getElementById("page-info").textContent = "解析中...";
-      await uploadAndRenderPpt(file);
+      document.getElementById("page-info").textContent = "美化中...";
+      
+      // 先美化 PPT，获取美化后的 blob
+      await uploadAndBeautifyPpt(file);
+      
+      // 使用美化后的 blob 进行预览
+      if (beautifiedPptBlob) {
+        // 将 blob 转换为 File 对象
+        const beautifiedFile = new File([beautifiedPptBlob], file.name, {
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        await parseAndRenderPpt(beautifiedFile);
+      }
+      
+      document.getElementById("page-info").textContent = 
+        `美化完成！${slidesData.length} 页`;
+      
     } catch (err) {
       console.error(err);
       alert(err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     } finally {
-      fileInput.value = ""; // 方便再次选择同一个文件
+      fileInput.value = "";
     }
   });
 }
@@ -245,6 +296,11 @@ async function init() {
     await loadTheme();
     bindControls();
     document.getElementById("page-info").textContent = "0 / 0";
+    
+    // 隐藏下载按钮（初始状态）
+    const downloadBtn = document.getElementById("btn-download");
+    downloadBtn.style.display = "none";
+    
   } catch (err) {
     console.error("初始化失败:", err);
     alert("初始化失败：" + err.message);
