@@ -29,7 +29,7 @@ async function parsePPT(file) {
     });
     
     if (!response.ok) {
-      throw new Error(`解析失败: ${response.status}`);
+      throw new Error(`Parse failed: ${response.status}`);
     }
     
     const data = await response.json();
@@ -51,7 +51,7 @@ function showPreview(pptData, filename) {
   // 设置文件信息
   filenameEl.textContent = filename;
   const slideCount = pptData.slides ? pptData.slides.length : 0;
-  slidecountEl.textContent = `${slideCount} 页幻灯片`;
+  slidecountEl.textContent = `${slideCount} slides`;
   
   // 清空之前的内容
   content.innerHTML = '';
@@ -63,7 +63,7 @@ function showPreview(pptData, filename) {
     slideDiv.className = 'slide-preview';
     
     const title = document.createElement('h3');
-    title.textContent = `第 ${index + 1} 页`;
+    title.textContent = `Slide ${index + 1}`;
     slideDiv.appendChild(title);
     
     // 提取文字内容
@@ -82,7 +82,7 @@ function showPreview(pptData, filename) {
     if (slideText) {
       textDiv.textContent = slideText;
     } else {
-      textDiv.textContent = '(此页无文字内容)';
+      textDiv.textContent = '(No text content on this slide)';
       textDiv.style.color = 'var(--mai-text-muted)';
       textDiv.style.fontStyle = 'italic';
     }
@@ -194,7 +194,7 @@ async function loadPDF(pdfData) {
     
   } catch (error) {
     console.error("[PDF] 加载失败:", error);
-    alert("PDF加载失败: " + error.message);
+    alert("PDF loading failed: " + error.message);
   }
 }
 
@@ -271,7 +271,7 @@ async function loadFixedTemplatePDF() {
       const response = await fetch(`${API_BASE}/api/fixed_template_pdf`);
       
       if (!response.ok) {
-        throw new Error(`HTTP错误: ${response.status}`);
+        throw new Error(`HTTP error: ${response.status}`);
       }
       
       const blob = await response.blob();
@@ -305,7 +305,7 @@ async function loadFixedTemplatePDF() {
 
 function downloadBeautifiedPpt() {
   if (!beautifiedPdfBlob) {
-    alert("没有可下载的文件");
+    alert("No file available for download");
     return;
   }
 
@@ -369,7 +369,7 @@ function bindControls() {
       console.log("[上传] 用户上传了文件:", file.name);
       
       currentPptFile = file;
-      document.getElementById("page-info").textContent = "解析中...";
+      document.getElementById("page-info").textContent = "Parsing...";
       
       // 解析PPT并显示预览
       const pptData = await parsePPT(file);
@@ -379,7 +379,7 @@ function bindControls() {
       
     } catch (err) {
       console.error("[错误]", err);
-      alert("解析失败: " + err.message);
+      alert("Parse failed: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     } finally {
       fileInput.value = "";
@@ -400,7 +400,7 @@ function bindControls() {
       // 隐藏预览面板
       hidePreview();
       
-      document.getElementById("page-info").textContent = "处理中...";
+      document.getElementById("page-info").textContent = "Processing...";
       
       // 开始美化流程（显示动画和加载PDF）
       await loadFixedTemplatePDF();
@@ -411,7 +411,7 @@ function bindControls() {
       
     } catch (err) {
       console.error("[错误]", err);
-      alert("美化失败: " + err.message);
+      alert("Beautification failed: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     }
   });
@@ -437,7 +437,7 @@ async function init() {
     
   } catch (err) {
     console.error("[初始化] 失败:", err);
-    document.getElementById("page-info").textContent = "初始化失败";
+    document.getElementById("page-info").textContent = "Init failed";
   }
 }
 
