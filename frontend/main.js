@@ -296,26 +296,20 @@ function bindControls() {
     if (!file) return;
 
     try {
-      document.getElementById("page-info").textContent = "处理中...";
+      document.getElementById("page-info").textContent = "加载中...";
       
-      // 直接使用固定模板，忽略用户上传的文件
-      console.log("用户上传了文件:", file.name, "但显示固定模板");
+      // 用户上传文件后，显示固定模板
+      console.log("用户上传了文件:", file.name, "现在加载并显示固定模板");
       
-      // 确保固定模板已加载
-      if (slidesData.length === 0) {
-        await loadFixedTemplate();
-      }
-      
-      // 重新显示固定模板（确保是最新状态）
-      createSlideElements(templateData.meta, slidesData);
-      showSlide(0);
+      // 加载固定模板
+      await loadFixedTemplate();
       
       document.getElementById("page-info").textContent = 
-        `处理完成！${slidesData.length} 页`;
+        `${slidesData.length} / ${slidesData.length}`;
       
     } catch (err) {
       console.error(err);
-      alert("处理失败: " + err.message);
+      alert("加载失败: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     } finally {
       fileInput.value = "";
@@ -330,19 +324,12 @@ async function init() {
     await loadTheme();
     bindControls();
     
-    // 初始显示"加载中"
-    document.getElementById("page-info").textContent = "加载模板...";
-    
-    // 加载固定模板数据
-    await loadFixedTemplate();
+    // 初始时不加载任何内容，等待用户上传
+    document.getElementById("page-info").textContent = "0 / 0";
     
   } catch (err) {
     console.error("初始化失败:", err);
-    document.getElementById("page-info").textContent = "加载失败";
-    
-    // 隐藏下载按钮
-    const downloadBtn = document.getElementById("btn-download");
-    downloadBtn.style.display = "none";
+    document.getElementById("page-info").textContent = "初始化失败";
   }
 }
 
