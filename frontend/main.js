@@ -80,6 +80,42 @@ function initBackgroundAnimation() {
   console.log('[背景动画] 初始化完成');
 }
 
+// 隐藏背景文字动画
+function hideBackgroundAnimation() {
+  const rotatingContainer = document.getElementById('rotating-text-container');
+  const scatteredContainer = document.getElementById('scattered-words-container');
+  
+  if (rotatingContainer) {
+    rotatingContainer.style.transition = 'opacity 0.5s ease';
+    rotatingContainer.style.opacity = '0';
+  }
+  
+  if (scatteredContainer) {
+    scatteredContainer.style.transition = 'opacity 0.5s ease';
+    scatteredContainer.style.opacity = '0';
+  }
+  
+  console.log('[背景动画] 已隐藏');
+}
+
+// 显示背景文字动画
+function showBackgroundAnimation() {
+  const rotatingContainer = document.getElementById('rotating-text-container');
+  const scatteredContainer = document.getElementById('scattered-words-container');
+  
+  if (rotatingContainer) {
+    rotatingContainer.style.transition = 'opacity 0.5s ease';
+    rotatingContainer.style.opacity = '1';
+  }
+  
+  if (scatteredContainer) {
+    scatteredContainer.style.transition = 'opacity 0.5s ease';
+    scatteredContainer.style.opacity = '1';
+  }
+  
+  console.log('[背景动画] 已显示');
+}
+
 // ========= 全局状态 =========
 let pdfDoc = null;
 let currentPage = 1;
@@ -129,6 +165,9 @@ function showPreview(pptData, filename) {
   const content = document.getElementById('preview-content');
   const filenameEl = document.getElementById('preview-filename');
   const slidecountEl = document.getElementById('preview-slidecount');
+  
+  // 隐藏背景文字动画
+  hideBackgroundAnimation();
   
   // 设置文件信息
   filenameEl.textContent = filename;
@@ -180,6 +219,9 @@ function showPreview(pptData, filename) {
 function hidePreview() {
   const panel = document.getElementById('preview-panel');
   panel.classList.remove('show');
+  
+  // 恢复背景文字动画
+  showBackgroundAnimation();
 }
 
 // ========= 处理动画 =========
@@ -197,6 +239,9 @@ async function showProcessingAnimation() {
   const progressFill = document.getElementById('progress-fill');
   const canvas = document.getElementById('pdf-canvas');
   const background = document.getElementById('animated-background');
+  
+  // 隐藏背景文字动画
+  hideBackgroundAnimation();
   
   canvas.style.display = 'none';
   animationDiv.style.display = 'block';
