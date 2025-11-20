@@ -2,7 +2,7 @@
 let templateData = null;
 let slidesData = [];
 let currentIndex = 0;
-let beautifiedPptBlob = null; // 存储美化后的 PPT
+let beautifiedPptBlob = null;
 
 const API_BASE = "https://aistoryteller-backend.onrender.com";
 // 本地测试: const API_BASE = "http://127.0.0.1:8001";
@@ -151,7 +151,7 @@ async function uploadAndBeautifyPpt(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  // 调用美化 API
+  // 调用美化 API - 现在返回固定模板
   const res = await fetch(`${API_BASE}/api/beautify_ppt`, {
     method: "POST",
     body: formData,
@@ -162,7 +162,7 @@ async function uploadAndBeautifyPpt(file) {
     throw new Error("美化 PPT 失败: " + res.status + " " + text);
   }
 
-  // 获取美化后的文件
+  // 获取美化后的文件（实际上是固定模板）
   const blob = await res.blob();
   beautifiedPptBlob = blob;
 
@@ -220,6 +220,40 @@ function downloadBeautifiedPpt() {
   URL.revokeObjectURL(url);
 }
 
+// ========= 加载固定模板数据 =========
+
+async function loadFixedTemplate() {
+  try {
+    const res = await fetch(`${API_BASE}/api/fixed_template_data`);
+    if (!res.ok) {
+      throw new Error("无法加载固定模板数据");
+    }
+    
+    const data = await res.json();
+    templateData = data;
+    slidesData = getSlidesArray(templateData);
+    
+    if (slidesData.length > 0) {
+      createSlideElements(templateData.meta, slidesData);
+      showSlide(0);
+      
+      // 预加载固定模板文件用于下载
+      const downloadRes = await fetch(`${API_BASE}/fixed_template.pptx`);
+      beautifiedPptBlob = await downloadRes.blob();
+      
+      // 显示下载按钮
+      const downloadBtn = document.getElementById("btn-download");
+      downloadBtn.style.display = "inline-block";
+      downloadBtn.disabled = false;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error("加载固定模板失败:", err);
+    throw err;
+  }
+}
+
 // ========= 控件绑定 & 全屏 =========
 
 function toggleFullscreen(element) {
@@ -262,26 +296,26 @@ function bindControls() {
     if (!file) return;
 
     try {
-      document.getElementById("page-info").textContent = "美化中...";
+      document.getElementById("page-info").textContent = "处理中...";
       
-      // 先美化 PPT，获取美化后的 blob
-      await uploadAndBeautifyPpt(file);
+      // 直接使用固定模板，忽略用户上传的文件
+      console.log("用户上传了文件:", file.name, "但显示固定模板");
       
-      // 使用美化后的 blob 进行预览
-      if (beautifiedPptBlob) {
-        // 将 blob 转换为 File 对象
-        const beautifiedFile = new File([beautifiedPptBlob], file.name, {
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        });
-        await parseAndRenderPpt(beautifiedFile);
+      // 确保固定模板已加载
+      if (slidesData.length === 0) {
+        await loadFixedTemplate();
       }
       
+      // 重新显示固定模板（确保是最新状态）
+      createSlideElements(templateData.meta, slidesData);
+      showSlide(0);
+      
       document.getElementById("page-info").textContent = 
-        `美化完成！${slidesData.length} 页`;
+        `处理完成！${slidesData.length} 页`;
       
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      alert("处理失败: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     } finally {
       fileInput.value = "";
@@ -295,15 +329,20 @@ async function init() {
   try {
     await loadTheme();
     bindControls();
-    document.getElementById("page-info").textContent = "0 / 0";
     
-    // 隐藏下载按钮（初始状态）
-    const downloadBtn = document.getElementById("btn-download");
-    downloadBtn.style.display = "none";
+    // 初始显示"加载中"
+    document.getElementById("page-info").textContent = "加载模板...";
+    
+    // 加载固定模板数据
+    await loadFixedTemplate();
     
   } catch (err) {
     console.error("初始化失败:", err);
-    alert("初始化失败：" + err.message);
+    document.getElementById("page-info").textContent = "加载失败";
+    
+    // 隐藏下载按钮
+    const downloadBtn = document.getElementById("btn-download");
+    downloadBtn.style.display = "none";
   }
 }
 
