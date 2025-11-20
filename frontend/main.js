@@ -1,3 +1,85 @@
+// ========= 背景文字动画 =========
+
+// 多语言和多维度的词汇列表
+const centerWords = [
+  // 英文
+  'Story', 'Dream', 'Create', 'Imagine',
+  // 中文
+  '故事', '梦想', '创意', '灵感',
+  // 日文
+  '物語', '夢', '創造', '想像',
+  // 韩文
+  '이야기', '꿈', '창의', '상상',
+  // 法文
+  'Histoire', 'Rêve', 'Créer',
+  // 德文
+  'Geschichte', 'Traum', 'Kreativ',
+  // 西班牙文
+  'Historia', 'Sueño', 'Crear',
+  // 阿拉伯文
+  'قصة', 'حلم', 'إبداع',
+  // 印地文
+  'कहानी', 'सपना', 'रचना'
+];
+
+const scatteredWords = [
+  'AI', 'Tale', 'Art', 'Magic', 'Inspire', 'Wonder', 'Future', 'Vision',
+  '艺术', '魔法', '未来', '愿景', '启发', '奇迹',
+  'アート', 'ビジョン', '미래', '예술',
+  'Kunst', 'Magie', 'Arte', 'Visión',
+  'فن', 'رؤية', 'कला', 'दृष्टि'
+];
+
+function initBackgroundAnimation() {
+  // 初始化中心大字循环动画
+  const rotatingContainer = document.getElementById('rotating-text-container');
+  if (rotatingContainer) {
+    // 随机选择4个不同的词
+    const selectedWords = [];
+    const usedIndices = new Set();
+    
+    while (selectedWords.length < 4) {
+      const randomIndex = Math.floor(Math.random() * centerWords.length);
+      if (!usedIndices.has(randomIndex)) {
+        usedIndices.add(randomIndex);
+        selectedWords.push(centerWords[randomIndex]);
+      }
+    }
+    
+    selectedWords.forEach(word => {
+      const div = document.createElement('div');
+      div.className = 'rotating-text';
+      div.textContent = word;
+      rotatingContainer.appendChild(div);
+    });
+  }
+
+  // 初始化散落的小字
+  const scatteredContainer = document.getElementById('scattered-words-container');
+  if (scatteredContainer) {
+    // 随机选择8个不同的词
+    const selectedScattered = [];
+    const usedIndices = new Set();
+    
+    while (selectedScattered.length < 8) {
+      const randomIndex = Math.floor(Math.random() * scatteredWords.length);
+      if (!usedIndices.has(randomIndex)) {
+        usedIndices.add(randomIndex);
+        selectedScattered.push(scatteredWords[randomIndex]);
+      }
+    }
+    
+    selectedScattered.forEach(word => {
+      const span = document.createElement('span');
+      span.className = 'scattered-word';
+      span.textContent = word;
+      scatteredContainer.appendChild(span);
+    });
+  }
+
+  console.log('[背景动画] 初始化完成');
+}
+
 // ========= 全局状态 =========
 let pdfDoc = null;
 let currentPage = 1;
@@ -430,6 +512,9 @@ async function init() {
   try {
     await loadTheme();
     bindControls();
+    
+    // 初始化背景文字动画
+    initBackgroundAnimation();
     
     document.getElementById("page-info").textContent = "0 / 0";
     

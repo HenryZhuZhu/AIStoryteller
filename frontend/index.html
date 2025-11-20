@@ -5,7 +5,7 @@
     <title>AIStoryteller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="style.css" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
     <!-- PDF.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
@@ -114,6 +114,148 @@
         0%, 100% { transform: translate(0, 0) scale(1); }
         33% { transform: translate(40px, 40px) scale(1.05); }
         66% { transform: translate(-40px, -20px) scale(0.95); }
+      }
+
+      /* Rotating text animation - Apple style */
+      .text-animation-container {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .rotating-text {
+        position: absolute;
+        font-size: 120px;
+        font-weight: 700;
+        color: rgba(0, 0, 0, 0.03);
+        white-space: nowrap;
+        opacity: 0;
+        transform: scale(0.8);
+        animation: textFadeInOut 8s ease-in-out infinite;
+        will-change: opacity, transform;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      .rotating-text:nth-child(1) { animation-delay: 0s; }
+      .rotating-text:nth-child(2) { animation-delay: 2s; }
+      .rotating-text:nth-child(3) { animation-delay: 4s; }
+      .rotating-text:nth-child(4) { animation-delay: 6s; }
+
+      @keyframes textFadeInOut {
+        0% {
+          opacity: 0;
+          transform: scale(0.8) translateY(20px);
+        }
+        5% {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+        20% {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+        25% {
+          opacity: 0;
+          transform: scale(1.1) translateY(-20px);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.1) translateY(-20px);
+        }
+      }
+
+      /* Scattered smaller words */
+      .scattered-words {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .scattered-word {
+        position: absolute;
+        font-size: 24px;
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.04);
+        opacity: 0;
+        animation: scatteredFade 12s ease-in-out infinite;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      .scattered-word:nth-child(1) {
+        top: 15%;
+        left: 10%;
+        animation-delay: 0s;
+      }
+
+      .scattered-word:nth-child(2) {
+        top: 25%;
+        right: 15%;
+        animation-delay: 1.5s;
+      }
+
+      .scattered-word:nth-child(3) {
+        bottom: 20%;
+        left: 20%;
+        animation-delay: 3s;
+      }
+
+      .scattered-word:nth-child(4) {
+        top: 60%;
+        right: 25%;
+        animation-delay: 4.5s;
+      }
+
+      .scattered-word:nth-child(5) {
+        top: 40%;
+        left: 15%;
+        animation-delay: 6s;
+      }
+
+      .scattered-word:nth-child(6) {
+        bottom: 30%;
+        right: 20%;
+        animation-delay: 7.5s;
+      }
+
+      .scattered-word:nth-child(7) {
+        top: 70%;
+        left: 50%;
+        animation-delay: 9s;
+      }
+
+      .scattered-word:nth-child(8) {
+        top: 30%;
+        left: 40%;
+        animation-delay: 10.5s;
+      }
+
+      @keyframes scatteredFade {
+        0% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        8% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        25% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        33% {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
       }
 
       /* Preview panel */
@@ -336,11 +478,22 @@
       <main id="main">
         <!-- Animated background -->
         <div id="animated-background">
+          <!-- Light orbs -->
           <div class="light-orb"></div>
           <div class="light-orb"></div>
           <div class="light-orb"></div>
           <div class="light-orb"></div>
           <div class="light-orb"></div>
+
+          <!-- Rotating text animation (center, large) -->
+          <div class="text-animation-container" id="rotating-text-container">
+            <!-- Will be populated by JavaScript -->
+          </div>
+
+          <!-- Scattered smaller words -->
+          <div class="scattered-words" id="scattered-words-container">
+            <!-- Will be populated by JavaScript -->
+          </div>
         </div>
 
         <!-- Slide container -->
