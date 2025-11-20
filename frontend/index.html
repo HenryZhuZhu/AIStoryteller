@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>AIStoryteller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="style.css" />
     
-    <!-- PDF.js 库 -->
+    <!-- PDF.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <style>
-      /* 确保main容器可以包含绝对定位的背景 */
+      /* Main container */
       #main {
         position: relative;
         overflow: hidden;
       }
 
-      /* 流动光影背景 */
+      /* Animated background */
       #animated-background {
         position: absolute;
         top: 0;
@@ -32,7 +32,7 @@
         z-index: 1;
       }
 
-      /* 光球样式 */
+      /* Light orbs */
       .light-orb {
         position: absolute;
         border-radius: 50%;
@@ -116,7 +116,7 @@
         66% { transform: translate(-40px, -20px) scale(0.95); }
       }
 
-      /* 预览面板样式 */
+      /* Preview panel */
       #preview-panel {
         display: none;
         position: absolute;
@@ -132,7 +132,6 @@
         padding: 30px;
         z-index: 20;
         overflow: hidden;
-        display: flex;
         flex-direction: column;
       }
 
@@ -222,7 +221,7 @@
         box-shadow: 0 4px 12px rgba(244, 162, 97, 0.4);
       }
 
-      /* 处理动画样式 */
+      /* Processing animation */
       #processing-animation {
         display: none;
         position: absolute;
@@ -289,7 +288,7 @@
         border-radius: 2px;
       }
 
-      /* 滚动条样式 */
+      /* Scrollbar styles */
       .preview-content::-webkit-scrollbar {
         width: 6px;
       }
@@ -313,12 +312,12 @@
           <span class="brand-name">Storyteller</span>
         </div>
         <div id="toolbar">
-          <button id="btn-prev">◀︎ 上一页</button>
+          <button id="btn-prev">◀︎ Previous</button>
           <span id="page-info">0 / 0</span>
-          <button id="btn-next">下一页 ▶︎</button>
-          <button id="btn-fullscreen">全屏</button>
+          <button id="btn-next">Next ▶︎</button>
+          <button id="btn-fullscreen">Fullscreen</button>
 
-          <!-- 上传 PPT 按钮 -->
+          <!-- Upload PPT button -->
           <label id="upload-label">
             <input
               id="ppt-file-input"
@@ -326,16 +325,16 @@
               accept=".ppt,.pptx"
               hidden
             />
-            <span>上传 PPT</span>
+            <span>Upload PPT</span>
           </label>
 
-          <!-- 下载美化版按钮 -->
-          <button id="btn-download" style="display: none;">⬇️ 下载美化版</button>
+          <!-- Download button -->
+          <button id="btn-download" style="display: none;">⬇️ Download</button>
         </div>
       </header>
 
       <main id="main">
-        <!-- 流动光影背景 -->
+        <!-- Animated background -->
         <div id="animated-background">
           <div class="light-orb"></div>
           <div class="light-orb"></div>
@@ -344,27 +343,27 @@
           <div class="light-orb"></div>
         </div>
 
-        <!-- slide容器 -->
+        <!-- Slide container -->
         <div id="slide-container">
-          <!-- 预览面板 -->
+          <!-- Preview panel -->
           <div id="preview-panel">
             <div class="preview-header">
-              <h2>PPT内容预览</h2>
+              <h2>PPT Content Preview</h2>
               <div class="preview-info">
                 <span id="preview-filename"></span> · 
                 <span id="preview-slidecount"></span>
               </div>
             </div>
             <div class="preview-content" id="preview-content">
-              <!-- 动态生成预览内容 -->
+              <!-- Dynamic preview content -->
             </div>
             <div class="preview-actions">
-              <button class="btn-cancel" id="btn-cancel-preview">取消</button>
-              <button class="btn-beautify" id="btn-start-beautify">✨ 开始美化</button>
+              <button class="btn-cancel" id="btn-cancel-preview">Cancel</button>
+              <button class="btn-beautify" id="btn-start-beautify">✨ Start Beautify</button>
             </div>
           </div>
 
-          <!-- 处理动画 -->
+          <!-- Processing animation -->
           <div id="processing-animation">
             <div id="processing-text" class="processing-stage"></div>
             <div class="progress-bar">
@@ -372,7 +371,7 @@
             </div>
           </div>
           
-          <!-- PDF渲染 -->
+          <!-- PDF rendering -->
           <canvas id="pdf-canvas" style="display: none;"></canvas>
         </div>
       </main>
