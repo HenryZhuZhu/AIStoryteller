@@ -27,6 +27,7 @@ async function showProcessingAnimation() {
   const textDiv = document.getElementById('processing-text');
   const progressFill = document.getElementById('progress-fill');
   const canvas = document.getElementById('pdf-canvas');
+  const background = document.getElementById('animated-background');
   
   // 隐藏canvas，显示动画
   canvas.style.display = 'none';
@@ -53,6 +54,15 @@ async function showProcessingAnimation() {
   
   // 动画结束，隐藏
   animationDiv.style.display = 'none';
+  
+  // 隐藏流动背景（因为PDF要显示了）
+  if (background) {
+    background.style.transition = 'opacity 0.5s ease';
+    background.style.opacity = '0';
+    setTimeout(() => {
+      background.style.display = 'none';
+    }, 500);
+  }
 }
 
 // ========= 主题加载 =========
