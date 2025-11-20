@@ -8,6 +8,75 @@
     
     <!-- PDF.js 库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <style>
+      /* 处理动画样式 */
+      #processing-animation {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 10;
+      }
+
+      .processing-stage {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--mai-text-main);
+        margin-bottom: 20px;
+        opacity: 0;
+        animation: fadeInOut 1.5s ease-in-out;
+      }
+
+      @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(10px); }
+        20% { opacity: 1; transform: translateY(0); }
+        80% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-10px); }
+      }
+
+      .processing-dots {
+        display: inline-block;
+        margin-left: 4px;
+      }
+
+      .processing-dots span {
+        animation: blink 1.4s infinite;
+        opacity: 0;
+      }
+
+      .processing-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .processing-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 1; }
+      }
+
+      .progress-bar {
+        width: 300px;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 30px auto 0;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #f4a261, #e76f51);
+        width: 0%;
+        transition: width 0.3s ease;
+        border-radius: 2px;
+      }
+    </style>
   </head>
   <body>
     <div id="app">
@@ -41,12 +110,16 @@
       <main id="main">
         <!-- 使用原有的slide-container作为PDF容器 -->
         <div id="slide-container">
+          <!-- 处理动画 -->
+          <div id="processing-animation">
+            <div id="processing-text" class="processing-stage"></div>
+            <div class="progress-bar">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+          </div>
+          
           <!-- PDF会渲染到这个canvas上 -->
           <canvas id="pdf-canvas" style="display: none;"></canvas>
-          <!-- loading提示 -->
-          <div id="pdf-loading" style="display: none; text-align: center; padding: 40px; color: var(--mai-text-muted);">
-            <div style="font-size: 18px;">加载中...</div>
-          </div>
         </div>
       </main>
     </div>

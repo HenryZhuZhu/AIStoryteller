@@ -13,6 +13,48 @@ if (typeof pdfjsLib !== 'undefined') {
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+// ========= 处理动画 =========
+
+const PROCESSING_STAGES = [
+  { text: "Analyzing", duration: 1500, progress: 25 },
+  { text: "Matching", duration: 1500, progress: 50 },
+  { text: "Beautifying", duration: 1500, progress: 75 },
+  { text: "Generating", duration: 1500, progress: 100 }
+];
+
+async function showProcessingAnimation() {
+  const animationDiv = document.getElementById('processing-animation');
+  const textDiv = document.getElementById('processing-text');
+  const progressFill = document.getElementById('progress-fill');
+  const canvas = document.getElementById('pdf-canvas');
+  
+  // 隐藏canvas，显示动画
+  canvas.style.display = 'none';
+  animationDiv.style.display = 'block';
+  
+  // 依次显示每个阶段
+  for (let i = 0; i < PROCESSING_STAGES.length; i++) {
+    const stage = PROCESSING_STAGES[i];
+    
+    // 更新文字
+    textDiv.innerHTML = `${stage.text}<span class="processing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+    textDiv.style.animation = 'none';
+    
+    // 触发重排以重启动画
+    void textDiv.offsetWidth;
+    textDiv.style.animation = 'fadeInOut 1.5s ease-in-out';
+    
+    // 更新进度条
+    progressFill.style.width = stage.progress + '%';
+    
+    // 等待当前阶段完成
+    await new Promise(resolve => setTimeout(resolve, stage.duration));
+  }
+  
+  // 动画结束，隐藏
+  animationDiv.style.display = 'none';
+}
+
 // ========= 主题加载 =========
 
 async function loadTheme() {
@@ -114,9 +156,6 @@ async function renderPage(pageNum) {
     
     await page.render(renderContext).promise;
     
-    // 隐藏loading
-    document.getElementById('pdf-loading').style.display = 'none';
-    
     console.log(`[PDF] 第 ${pageNum} 页渲染完成`);
     
   } catch (error) {
@@ -147,26 +186,31 @@ function showSlide(index) {
 
 async function loadFixedTemplatePDF() {
   try {
-    console.log("[API] 请求固定模板PDF...");
+    console.log("[API] 开始处理流程...");
     
-    // 显示loading
-    const loading = document.getElementById('pdf-loading');
-    loading.style.display = 'block';
-    loading.innerHTML = '<div style="font-size: 18px;">正在加载PDF...</div>';
+    // 显示处理动画（总时长约6秒）
+    const animationPromise = showProcessingAnimation();
     
-    const response = await fetch(`${API_BASE}/api/fixed_template_pdf`);
+    // 同时加载PDF（在动画进行时）
+    const loadPromise = (async () => {
+      const response = await fetch(`${API_BASE}/api/fixed_template_pdf`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP错误: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      beautifiedPdfBlob = blob;
+      
+      console.log("[API] PDF下载完成，大小:", blob.size, "bytes");
+      
+      // 将blob转换为ArrayBuffer用于PDF.js
+      const arrayBuffer = await blob.arrayBuffer();
+      return arrayBuffer;
+    })();
     
-    if (!response.ok) {
-      throw new Error(`HTTP错误: ${response.status}`);
-    }
-    
-    const blob = await response.blob();
-    beautifiedPdfBlob = blob;
-    
-    console.log("[API] PDF下载完成，大小:", blob.size, "bytes");
-    
-    // 将blob转换为ArrayBuffer用于PDF.js
-    const arrayBuffer = await blob.arrayBuffer();
+    // 等待动画和加载都完成
+    const [_, arrayBuffer] = await Promise.all([animationPromise, loadPromise]);
     
     // 加载并渲染PDF
     await loadPDF(arrayBuffer);
@@ -176,9 +220,15 @@ async function loadFixedTemplatePDF() {
     downloadBtn.style.display = "inline-block";
     downloadBtn.disabled = false;
     
-    return blob;
+    console.log("[完成] 处理流程完成");
+    
+    return beautifiedPdfBlob;
   } catch (error) {
     console.error("[API] 加载固定模板PDF失败:", error);
+    
+    // 隐藏动画
+    document.getElementById('processing-animation').style.display = 'none';
+    
     throw error;
   }
 }
@@ -251,23 +301,20 @@ function bindControls() {
     try {
       console.log("[上传] 用户上传了文件:", file.name);
       
-      document.getElementById("page-info").textContent = "加载中...";
+      document.getElementById("page-info").textContent = "处理中...";
       
-      // 加载固定模板PDF
+      // 加载固定模板PDF（包含动画）
       await loadFixedTemplatePDF();
       
       // 更新页面信息
       document.getElementById("page-info").textContent = `1 / ${totalPages}`;
       
-      console.log("[完成] 固定模板PDF加载完成");
+      console.log("[完成] 处理完成");
       
     } catch (err) {
       console.error("[错误]", err);
-      alert("加载失败: " + err.message);
+      alert("处理失败: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
-      
-      // 隐藏loading
-      document.getElementById('pdf-loading').style.display = 'none';
     } finally {
       fileInput.value = "";
     }
