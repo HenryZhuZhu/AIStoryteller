@@ -3,6 +3,7 @@ let pdfDoc = null;
 let currentPage = 1;
 let totalPages = 0;
 let beautifiedPdfBlob = null;
+let currentPptFile = null;
 
 const API_BASE = "https://aistoryteller-backend.onrender.com";
 // 本地测试: const API_BASE = "http://127.0.0.1:8001";
@@ -11,6 +12,92 @@ const API_BASE = "https://aistoryteller-backend.onrender.com";
 if (typeof pdfjsLib !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ========= PPT解析和预览 =========
+
+async function parsePPT(file) {
+  try {
+    console.log("[解析] 开始解析PPT:", file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_BASE}/api/parse_ppt`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`解析失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("[解析] 解析成功:", data);
+    
+    return data;
+  } catch (error) {
+    console.error("[解析] 解析失败:", error);
+    throw error;
+  }
+}
+
+function showPreview(pptData, filename) {
+  const panel = document.getElementById('preview-panel');
+  const content = document.getElementById('preview-content');
+  const filenameEl = document.getElementById('preview-filename');
+  const slidecountEl = document.getElementById('preview-slidecount');
+  
+  // 设置文件信息
+  filenameEl.textContent = filename;
+  const slideCount = pptData.slides ? pptData.slides.length : 0;
+  slidecountEl.textContent = `${slideCount} 页幻灯片`;
+  
+  // 清空之前的内容
+  content.innerHTML = '';
+  
+  // 生成每页的预览
+  const slides = pptData.slides || [];
+  slides.forEach((slide, index) => {
+    const slideDiv = document.createElement('div');
+    slideDiv.className = 'slide-preview';
+    
+    const title = document.createElement('h3');
+    title.textContent = `第 ${index + 1} 页`;
+    slideDiv.appendChild(title);
+    
+    // 提取文字内容
+    const textDiv = document.createElement('div');
+    textDiv.className = 'slide-text';
+    
+    let slideText = '';
+    if (slide.shapes && slide.shapes.length > 0) {
+      slide.shapes.forEach(shape => {
+        if (shape.text && shape.text.trim()) {
+          slideText += shape.text.trim() + '\n';
+        }
+      });
+    }
+    
+    if (slideText) {
+      textDiv.textContent = slideText;
+    } else {
+      textDiv.textContent = '(此页无文字内容)';
+      textDiv.style.color = 'var(--mai-text-muted)';
+      textDiv.style.fontStyle = 'italic';
+    }
+    
+    slideDiv.appendChild(textDiv);
+    content.appendChild(slideDiv);
+  });
+  
+  // 显示预览面板
+  panel.classList.add('show');
+}
+
+function hidePreview() {
+  const panel = document.getElementById('preview-panel');
+  panel.classList.remove('show');
 }
 
 // ========= 处理动画 =========
@@ -29,33 +116,25 @@ async function showProcessingAnimation() {
   const canvas = document.getElementById('pdf-canvas');
   const background = document.getElementById('animated-background');
   
-  // 隐藏canvas，显示动画
   canvas.style.display = 'none';
   animationDiv.style.display = 'block';
   
-  // 依次显示每个阶段
   for (let i = 0; i < PROCESSING_STAGES.length; i++) {
     const stage = PROCESSING_STAGES[i];
     
-    // 更新文字
     textDiv.innerHTML = `${stage.text}<span class="processing-dots"><span>.</span><span>.</span><span>.</span></span>`;
     textDiv.style.animation = 'none';
-    
-    // 触发重排以重启动画
     void textDiv.offsetWidth;
     textDiv.style.animation = 'fadeInOut 1.5s ease-in-out';
     
-    // 更新进度条
     progressFill.style.width = stage.progress + '%';
     
-    // 等待当前阶段完成
     await new Promise(resolve => setTimeout(resolve, stage.duration));
   }
   
-  // 动画结束，隐藏
   animationDiv.style.display = 'none';
   
-  // 隐藏流动背景（因为PDF要显示了）
+  // 隐藏流动背景
   if (background) {
     background.style.transition = 'opacity 0.5s ease';
     background.style.opacity = '0';
@@ -98,7 +177,7 @@ function applyTheme(theme) {
   }
 }
 
-// ========= PDF 渲染（单页模式）=========
+// ========= PDF 渲染 =========
 
 async function loadPDF(pdfData) {
   try {
@@ -110,7 +189,6 @@ async function loadPDF(pdfData) {
     
     console.log(`[PDF] 加载成功，共 ${totalPages} 页`);
     
-    // 渲染第一页
     currentPage = 1;
     await renderPage(currentPage);
     
@@ -128,14 +206,11 @@ async function renderPage(pageNum) {
     const container = document.getElementById('slide-container');
     const context = canvas.getContext('2d');
     
-    // 获取页面
     const page = await pdfDoc.getPage(pageNum);
     
-    // 获取容器尺寸
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
     
-    // 计算缩放比例，让PDF填满容器
     const viewport = page.getViewport({ scale: 1.0 });
     const scaleX = containerWidth / viewport.width;
     const scaleY = containerHeight / viewport.height;
@@ -143,11 +218,9 @@ async function renderPage(pageNum) {
     
     const scaledViewport = page.getViewport({ scale: scale });
     
-    // 设置canvas尺寸
     canvas.width = scaledViewport.width;
     canvas.height = scaledViewport.height;
     
-    // 设置canvas样式，使其居中显示，并保持原有slide样式
     canvas.style.display = 'block';
     canvas.style.position = 'absolute';
     canvas.style.top = '50%';
@@ -158,7 +231,6 @@ async function renderPage(pageNum) {
     canvas.style.maxWidth = '100%';
     canvas.style.maxHeight = '100%';
     
-    // 渲染页面
     const renderContext = {
       canvasContext: context,
       viewport: scaledViewport
@@ -173,22 +245,17 @@ async function renderPage(pageNum) {
   }
 }
 
-// ========= 页面导航 =========
-
 function showSlide(index) {
   if (!pdfDoc) return;
   
-  // 限制范围
   if (index < 1) index = 1;
   if (index > totalPages) index = totalPages;
   
   currentPage = index;
   
-  // 更新页面信息
   const pageInfo = document.getElementById("page-info");
   pageInfo.textContent = `${currentPage} / ${totalPages}`;
   
-  // 渲染当前页
   renderPage(currentPage);
 }
 
@@ -198,10 +265,8 @@ async function loadFixedTemplatePDF() {
   try {
     console.log("[API] 开始处理流程...");
     
-    // 显示处理动画（总时长约6秒）
     const animationPromise = showProcessingAnimation();
     
-    // 同时加载PDF（在动画进行时）
     const loadPromise = (async () => {
       const response = await fetch(`${API_BASE}/api/fixed_template_pdf`);
       
@@ -214,18 +279,14 @@ async function loadFixedTemplatePDF() {
       
       console.log("[API] PDF下载完成，大小:", blob.size, "bytes");
       
-      // 将blob转换为ArrayBuffer用于PDF.js
       const arrayBuffer = await blob.arrayBuffer();
       return arrayBuffer;
     })();
     
-    // 等待动画和加载都完成
     const [_, arrayBuffer] = await Promise.all([animationPromise, loadPromise]);
     
-    // 加载并渲染PDF
     await loadPDF(arrayBuffer);
     
-    // 显示下载按钮
     const downloadBtn = document.getElementById("btn-download");
     downloadBtn.style.display = "inline-block";
     downloadBtn.disabled = false;
@@ -235,10 +296,7 @@ async function loadFixedTemplatePDF() {
     return beautifiedPdfBlob;
   } catch (error) {
     console.error("[API] 加载固定模板PDF失败:", error);
-    
-    // 隐藏动画
     document.getElementById('processing-animation').style.display = 'none';
-    
     throw error;
   }
 }
@@ -284,15 +342,14 @@ function bindControls() {
   const btnDownload = document.getElementById("btn-download");
   const app = document.getElementById("app");
   const fileInput = document.getElementById("ppt-file-input");
+  const btnCancelPreview = document.getElementById("btn-cancel-preview");
+  const btnStartBeautify = document.getElementById("btn-start-beautify");
 
-  // 翻页按钮
   btnPrev.addEventListener("click", () => showSlide(currentPage - 1));
   btnNext.addEventListener("click", () => showSlide(currentPage + 1));
-  
   btnFullscreen.addEventListener("click", () => toggleFullscreen(app));
   btnDownload.addEventListener("click", downloadBeautifiedPpt);
 
-  // 键盘快捷键
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") {
       showSlide(currentPage - 1);
@@ -303,7 +360,7 @@ function bindControls() {
     }
   });
 
-  // 文件上传处理
+  // 文件上传 - 显示预览
   fileInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -311,22 +368,51 @@ function bindControls() {
     try {
       console.log("[上传] 用户上传了文件:", file.name);
       
-      document.getElementById("page-info").textContent = "处理中...";
+      currentPptFile = file;
+      document.getElementById("page-info").textContent = "解析中...";
       
-      // 加载固定模板PDF（包含动画）
-      await loadFixedTemplatePDF();
+      // 解析PPT并显示预览
+      const pptData = await parsePPT(file);
+      showPreview(pptData, file.name);
       
-      // 更新页面信息
-      document.getElementById("page-info").textContent = `1 / ${totalPages}`;
-      
-      console.log("[完成] 处理完成");
+      document.getElementById("page-info").textContent = "0 / 0";
       
     } catch (err) {
       console.error("[错误]", err);
-      alert("处理失败: " + err.message);
+      alert("解析失败: " + err.message);
       document.getElementById("page-info").textContent = "0 / 0";
     } finally {
       fileInput.value = "";
+    }
+  });
+
+  // 取消预览
+  btnCancelPreview.addEventListener("click", () => {
+    hidePreview();
+    currentPptFile = null;
+  });
+
+  // 开始美化
+  btnStartBeautify.addEventListener("click", async () => {
+    try {
+      console.log("[美化] 用户点击开始美化");
+      
+      // 隐藏预览面板
+      hidePreview();
+      
+      document.getElementById("page-info").textContent = "处理中...";
+      
+      // 开始美化流程（显示动画和加载PDF）
+      await loadFixedTemplatePDF();
+      
+      document.getElementById("page-info").textContent = `1 / ${totalPages}`;
+      
+      console.log("[完成] 美化完成");
+      
+    } catch (err) {
+      console.error("[错误]", err);
+      alert("美化失败: " + err.message);
+      document.getElementById("page-info").textContent = "0 / 0";
     }
   });
 
@@ -345,7 +431,6 @@ async function init() {
     await loadTheme();
     bindControls();
     
-    // 初始时不加载任何内容，等待用户上传
     document.getElementById("page-info").textContent = "0 / 0";
     
     console.log("[初始化] 完成，等待用户上传PPT");
