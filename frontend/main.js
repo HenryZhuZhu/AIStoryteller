@@ -386,7 +386,8 @@ function showSlide(index) {
   renderPage(currentPage);
 }
 
-// ========= 调用后端美化 PPT（Gamma）并加载 PDF =========
+
+// ========= 调用后端美化 PPT（Gamma，多步）并加载 PDF =========
 
 async function loadFixedTemplatePDF() {
   try {
@@ -395,72 +396,108 @@ async function loadFixedTemplatePDF() {
       return;
     }
 
-    console.log("[API] 开始美化流程，调用后端 /api/beautify ...");
+    console.log("[API] 开始美化流程（多步 Gamma）...");
 
-    // 1. 开启动画
+    // 1. 开启动画（不强制等它结束）
     const animationPromise = showProcessingAnimation();
 
-    // 2. 调用后端 /api/beautify，把当前 PPT 发过去
-    const loadPromise = (async () => {
-      const formData = new FormData();
-      formData.append("file", currentPptFile, currentPptFile.name);
+    // 2. 调用 /api/beautify_start，拿到 generationId
+    const startForm = new FormData();
+    startForm.append("file", currentPptFile, currentPptFile.name);
 
-      const response = await fetch(`${API_BASE}/api/beautify`, {
-        method: "POST",
-        body: formData,
-      });
+    const startResp = await fetch(`${API_BASE}/api/beautify_start`, {
+      method: "POST",
+      body: startForm,
+    });
 
-      // 先克隆一份，方便后面既能读 text 又能读 blob
-      const clone = response.clone();
+    if (!startResp.ok) {
+      const text = await startResp.text();
+      console.error("[API] /api/beautify_start 错误:", text);
+      alert("Beautify start failed: " + text);
+      throw new Error("Beautify start failed");
+    }
 
-      // 网络层 / FastAPI 层错误（非 2xx）
-      if (!response.ok) {
-        const errorText = await clone.text();
-        console.error("[API] /api/beautify 响应错误 (HTTP 非 2xx):", errorText);
-        alert("Beautify failed (HTTP): " + errorText);
-        throw new Error(`HTTP error: ${response.status}`);
+    const startData = await startResp.json();
+    const generationId = startData.generationId;
+    console.log("[API] generationId =", generationId);
+
+    // 3. 轮询 /api/beautify_status，直到 status === "completed"
+    async function pollStatus() {
+      while (true) {
+        const statusResp = await fetch(
+          `${API_BASE}/api/beautify_status?generationId=${encodeURIComponent(
+            generationId
+          )}`
+        );
+
+        if (!statusResp.ok) {
+          const text = await statusResp.text();
+          console.error("[API] /api/beautify_status 错误:", text);
+          throw new Error("Beautify status failed: " + text);
+        }
+
+        const statusData = await statusResp.json();
+        console.log("[API] 当前状态:", statusData);
+
+        if (statusData.status === "completed") {
+          return statusData;
+        }
+
+        if (statusData.status === "failed" || statusData.status === "error") {
+          throw new Error("Gamma generation failed: " + JSON.stringify(statusData));
+        }
+
+        // 等 5 秒再问
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
+    }
 
-      const blob = await response.blob();
-      beautifiedPdfBlob = blob;
+    // 轮询状态（只做网络短操作，不会卡死 Render）
+    await pollStatus();
 
-      console.log("[API] 美化接口返回，大小:", blob.size, "bytes");
-      console.log("[API] 响应 Content-Type:", blob.type);
+    // 4. 任务完成后，调用 /api/beautify_result 拿最终 PDF
+    const resultResp = await fetch(
+      `${API_BASE}/api/beautify_result?generationId=${encodeURIComponent(
+        generationId
+      )}&filename=${encodeURIComponent(currentPptFile.name)}`
+    );
 
-      // 🚨 关键：如果后端返回的是 JSON（通常是错误信息），直接打印&提示，不再喂给 PDF.js
-      if (blob.type === "application/json" || blob.type === "text/json") {
-        const text = await clone.text();
-        console.error("[API] 后端返回的是 JSON 错误，而不是 PDF:", text);
-        alert("Beautify failed (JSON): " + text);
-        throw new Error("Backend returned JSON instead of PDF");
-      }
+    if (!resultResp.ok) {
+      const text = await resultResp.text();
+      console.error("[API] /api/beautify_result 错误:", text);
+      alert("Beautify result failed: " + text);
+      throw new Error("Beautify result failed");
+    }
 
-      // ===== 调试用：看一下文件头部字节 =====
-      const tmpBuffer = await blob.arrayBuffer();
-      console.log("File magic bytes:", new Uint8Array(tmpBuffer).slice(0, 20));
-      // ===== 调试结束 =====
+    const blob = await resultResp.blob();
+    beautifiedPdfBlob = blob;
 
-      return tmpBuffer;
-    })();
+    console.log("[API] 最终文件下载完成，大小:", blob.size, "bytes");
+    console.log("[API] Content-Type:", blob.type);
 
-    // 3. 等待：动画 + PDF 下载 同时完成
-    const [_, arrayBuffer] = await Promise.all([animationPromise, loadPromise]);
+    const arrayBuffer = await blob.arrayBuffer();
 
-    // 4. 用 PDF.js 渲染
+    // 等待动画至少跑完一轮（如果你希望这样）
+    try {
+      await animationPromise;
+    } catch (e) {
+      // 忽略动画内部的报错
+    }
+
+    // 5. 用 PDF.js 渲染
     await loadPDF(arrayBuffer);
 
-    // 5. 显示下载按钮
+    // 6. 显示下载按钮
     const downloadBtn = document.getElementById("btn-download");
     downloadBtn.style.display = "inline-block";
     downloadBtn.disabled = false;
 
     console.log("[完成] 美化流程完成");
-
     return beautifiedPdfBlob;
   } catch (error) {
     console.error("[API] 美化 PPT 失败:", error);
     document.getElementById("processing-animation").style.display = "none";
-    // 这里的 alert 在 JSON 错误那一步已经弹过一次，这里就不再重复
+    alert("Beautification failed: " + error.message);
     throw error;
   }
 }
