@@ -227,49 +227,115 @@ function hidePreview() {
 // ========= 处理动画 =========
 
 const PROCESSING_STAGES = [
-  { text: "Analyzing", duration: 1500, progress: 25 },
-  { text: "Matching", duration: 1500, progress: 50 },
+  { text: "Analyzing",   duration: 1500, progress: 25 },
+  { text: "Matching",    duration: 1500, progress: 50 },
   { text: "Beautifying", duration: 1500, progress: 75 },
-  { text: "Generating", duration: 1500, progress: 100 }
+  { text: "Generating",  duration: 1500, progress: 100 }
 ];
 
-async function showProcessingAnimation() {
-  const animationDiv = document.getElementById('processing-animation');
-  const textDiv = document.getElementById('processing-text');
-  const progressFill = document.getElementById('progress-fill');
-  const canvas = document.getElementById('pdf-canvas');
-  const background = document.getElementById('animated-background');
-  
-  // 隐藏背景文字动画
-  hideBackgroundAnimation();
-  
-  canvas.style.display = 'none';
-  animationDiv.style.display = 'block';
-  
-  for (let i = 0; i < PROCESSING_STAGES.length; i++) {
-    const stage = PROCESSING_STAGES[i];
-    
-    textDiv.innerHTML = `${stage.text}<span class="processing-dots"><span>.</span><span>.</span><span>.</span></span>`;
-    textDiv.style.animation = 'none';
-    void textDiv.offsetWidth;
-    textDiv.style.animation = 'fadeInOut 1.5s ease-in-out';
-    
-    progressFill.style.width = stage.progress + '%';
-    
-    await new Promise(resolve => setTimeout(resolve, stage.duration));
+let processingAnimationActive = false;
+
+function showProcessingAnimation() {
+  const animationDiv = document.getElementById("processing-animation");
+  const textDiv = document.getElementById("processing-text");
+  const progressFill = document.getElementById("progress-fill");
+  const canvas = document.getElementById("pdf-canvas");
+  const background = document.getElementById("animated-background");
+
+  if (!animationDiv || !textDiv || !progressFill) {
+    console.warn("[动画] 找不到动画相关 DOM 元素");
+    return;
   }
-  
-  animationDiv.style.display = 'none';
-  
-  // 隐藏流动背景
+
+  // 如果已经在播，就不用重复开
+  if (processingAnimationActive) {
+    return;
+  }
+  processingAnimationActive = true;
+
+  // 隐藏背景文字动画
+  if (typeof hideBackgroundAnimation === "function") {
+    hideBackgroundAnimation();
+  }
+
+  if (canvas) {
+    canvas.style.display = "none";
+  }
+
+  // 显示处理动画
+  animationDiv.style.display = "block";
+
+  // 显示流动背景（如果有）
   if (background) {
-    background.style.transition = 'opacity 0.5s ease';
-    background.style.opacity = '0';
+    background.style.display = "block";
+    background.style.opacity = "1";
+    background.style.transition = "opacity 0.5s ease";
+  }
+
+  // 启动一个循环任务，直到 processingAnimationActive 为 false
+  const runStages = async () => {
+    while (processingAnimationActive) {
+      for (let i = 0; i < PROCESSING_STAGES.length; i++) {
+        if (!processingAnimationActive) break;
+
+        const stage = PROCESSING_STAGES[i];
+
+        textDiv.innerHTML = `${stage.text}<span class="processing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+
+        // 重新触发文字动画
+        textDiv.style.animation = "none";
+        void textDiv.offsetWidth; // 强制 reflow
+        textDiv.style.animation = "fadeInOut 1.5s ease-in-out";
+
+        progressFill.style.width = stage.progress + "%";
+
+        await new Promise((resolve) => setTimeout(resolve, stage.duration));
+      }
+
+      // 一轮播完，如果还在 active，会从头再来一轮
+    }
+
+    // 退出循环后，负责把动画真正隐藏掉
+    animationDiv.style.display = "none";
+
+    if (background) {
+      background.style.opacity = "0";
+      setTimeout(() => {
+        background.style.display = "none";
+      }, 500);
+    }
+  };
+
+  // 不要 await，让它在后台跑
+  runStages();
+}
+
+function hideProcessingAnimation() {
+  const animationDiv = document.getElementById("processing-animation");
+  const canvas = document.getElementById("pdf-canvas");
+  const background = document.getElementById("animated-background");
+
+  processingAnimationActive = false;
+
+  // runStages 循环会自己把 animationDiv 隐藏，这里做兜底
+  if (animationDiv) {
+    animationDiv.style.display = "none";
+  }
+
+  if (canvas) {
+    canvas.style.display = "block";
+  }
+
+  if (background) {
+    background.style.opacity = "0";
     setTimeout(() => {
-      background.style.display = 'none';
+      background.style.display = "none";
     }, 500);
   }
+
+  console.log("[动画] 处理动画已停止");
 }
+
 
 // ========= 主题加载 =========
 
@@ -389,7 +455,12 @@ function showSlide(index) {
 
 // ========= 调用后端美化 PPT（Gamma，多步）并加载 PDF =========
 
+// ========= 调用后端美化 PPT（Gamma，多步）并加载 PDF =========
+
 async function loadFixedTemplatePDF() {
+  const beautifyBtn = document.getElementById("btn-start-beautify");
+  const downloadBtn = document.getElementById("btn-download");
+
   try {
     if (!currentPptFile) {
       alert("Please upload a PPTX file first.");
@@ -398,8 +469,10 @@ async function loadFixedTemplatePDF() {
 
     console.log("[API] 开始美化流程（多步 Gamma）...");
 
-    // 1. 开启动画（不强制等它结束）
-    const animationPromise = showProcessingAnimation();
+    // 启动处理动画 & 禁用按钮
+    showProcessingAnimation();
+    if (beautifyBtn) beautifyBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
 
     // 2. 调用 /api/beautify_start，拿到 generationId
     const startForm = new FormData();
@@ -443,8 +516,14 @@ async function loadFixedTemplatePDF() {
           return statusData;
         }
 
-        if (statusData.status === "failed" || statusData.status === "error") {
-          throw new Error("Gamma generation failed: " + JSON.stringify(statusData));
+        if (
+          statusData.status === "failed" ||
+          statusData.status === "error" ||
+          statusData.status === "cancelled"
+        ) {
+          throw new Error(
+            "Gamma generation failed: " + JSON.stringify(statusData)
+          );
         }
 
         // 等 5 秒再问
@@ -477,28 +556,25 @@ async function loadFixedTemplatePDF() {
 
     const arrayBuffer = await blob.arrayBuffer();
 
-    // 等待动画至少跑完一轮（如果你希望这样）
-    try {
-      await animationPromise;
-    } catch (e) {
-      // 忽略动画内部的报错
-    }
-
-    // 5. 用 PDF.js 渲染
+    // 用 PDF.js 渲染
     await loadPDF(arrayBuffer);
 
-    // 6. 显示下载按钮
-    const downloadBtn = document.getElementById("btn-download");
-    downloadBtn.style.display = "inline-block";
-    downloadBtn.disabled = false;
+    // 显示下载按钮
+    if (downloadBtn) {
+      downloadBtn.style.display = "inline-block";
+      downloadBtn.disabled = false;
+    }
 
     console.log("[完成] 美化流程完成");
     return beautifiedPdfBlob;
   } catch (error) {
     console.error("[API] 美化 PPT 失败:", error);
-    document.getElementById("processing-animation").style.display = "none";
-    alert("Beautification failed: " + error.message);
+    alert("Beautification failed: " + (error.message || error));
     throw error;
+  } finally {
+    // ✅ 无论成功/失败，都在这里统一收尾
+    hideProcessingAnimation();
+    if (beautifyBtn) beautifyBtn.disabled = false;
   }
 }
 
