@@ -386,47 +386,65 @@ function showSlide(index) {
   renderPage(currentPage);
 }
 
-// ========= 加载固定模板PDF =========
+// ========= 调用后端美化 PPT（Gamma）并加载 PDF =========
 
 async function loadFixedTemplatePDF() {
   try {
-    console.log("[API] 开始处理流程...");
-    
+    if (!currentPptFile) {
+      alert("Please upload a PPTX file first.");
+      return;
+    }
+
+    console.log("[API] 开始美化流程，准备调用后端 /api/beautify ...");
+
+    // 1. 开启动画
     const animationPromise = showProcessingAnimation();
-    
+
+    // 2. 调用后端 /api/beautify，把当前 PPT 发过去
     const loadPromise = (async () => {
-      const response = await fetch(`${API_BASE}/api/fixed_template_pdf`);
-      
+      const formData = new FormData();
+      formData.append("file", currentPptFile, currentPptFile.name);
+
+      const response = await fetch(`${API_BASE}/api/beautify`, {
+        method: "POST",
+        body: formData,
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);
       }
-      
+
       const blob = await response.blob();
       beautifiedPdfBlob = blob;
-      
-      console.log("[API] PDF下载完成，大小:", blob.size, "bytes");
-      
+
+      console.log("[API] 美化后的 PDF 下载完成，大小:", blob.size, "bytes");
+
       const arrayBuffer = await blob.arrayBuffer();
       return arrayBuffer;
     })();
-    
+
+    // 3. 等待：动画 + PDF 下载 同时完成
     const [_, arrayBuffer] = await Promise.all([animationPromise, loadPromise]);
-    
+
+    // 4. 用 PDF.js 渲染
     await loadPDF(arrayBuffer);
-    
+
+    // 5. 显示下载按钮
     const downloadBtn = document.getElementById("btn-download");
     downloadBtn.style.display = "inline-block";
     downloadBtn.disabled = false;
-    
-    console.log("[完成] 处理流程完成");
-    
+
+    console.log("[完成] 美化流程完成");
+
     return beautifiedPdfBlob;
   } catch (error) {
-    console.error("[API] 加载固定模板PDF失败:", error);
-    document.getElementById('processing-animation').style.display = 'none';
+    console.error("[API] 美化 PPT 失败:", error);
+    document.getElementById("processing-animation").style.display = "none";
+    alert("Beautification failed: " + error.message);
     throw error;
   }
 }
+
 
 // ========= 下载功能 =========
 
