@@ -590,3 +590,6 @@ async function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+console.log("Blob type:", blob.type);
+const arrayBuffer = await blob.arrayBuffer();
+console.log("First bytes:", new Uint8Array(arrayBuffer).slice(0, 12));
