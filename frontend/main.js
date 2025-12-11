@@ -395,7 +395,7 @@ async function loadFixedTemplatePDF() {
       return;
     }
 
-    console.log("[API] 开始美化流程，准备调用后端 /api/beautify ...");
+    console.log("[API] 开始美化流程，调用后端 /api/beautify ...");
 
     // 1. 开启动画
     const animationPromise = showProcessingAnimation();
@@ -410,25 +410,37 @@ async function loadFixedTemplatePDF() {
         body: formData,
       });
 
+      // 先克隆一份，方便后面既能读 text 又能读 blob
+      const clone = response.clone();
+
+      // 网络层 / FastAPI 层错误（非 2xx）
       if (!response.ok) {
+        const errorText = await clone.text();
+        console.error("[API] /api/beautify 响应错误 (HTTP 非 2xx):", errorText);
+        alert("Beautify failed (HTTP): " + errorText);
         throw new Error(`HTTP error: ${response.status}`);
       }
 
       const blob = await response.blob();
-beautifiedPdfBlob = blob;
+      beautifiedPdfBlob = blob;
 
-console.log("[API] 美化后的 PDF 下载完成，大小:", blob.size, "bytes");
+      console.log("[API] 美化接口返回，大小:", blob.size, "bytes");
+      console.log("[API] 响应 Content-Type:", blob.type);
 
-// ===== 调试输出：检查后端返回的文件格式 =====
-console.log("Blob type:", blob.type);
+      // 🚨 关键：如果后端返回的是 JSON（通常是错误信息），直接打印&提示，不再喂给 PDF.js
+      if (blob.type === "application/json" || blob.type === "text/json") {
+        const text = await clone.text();
+        console.error("[API] 后端返回的是 JSON 错误，而不是 PDF:", text);
+        alert("Beautify failed (JSON): " + text);
+        throw new Error("Backend returned JSON instead of PDF");
+      }
 
-const tmpBuffer = await blob.arrayBuffer();
-console.log("File magic bytes:", new Uint8Array(tmpBuffer).slice(0, 20));
-// =====（调试结束）=====
+      // ===== 调试用：看一下文件头部字节 =====
+      const tmpBuffer = await blob.arrayBuffer();
+      console.log("File magic bytes:", new Uint8Array(tmpBuffer).slice(0, 20));
+      // ===== 调试结束 =====
 
-const arrayBuffer = tmpBuffer;
-return arrayBuffer;
-
+      return tmpBuffer;
     })();
 
     // 3. 等待：动画 + PDF 下载 同时完成
@@ -448,10 +460,11 @@ return arrayBuffer;
   } catch (error) {
     console.error("[API] 美化 PPT 失败:", error);
     document.getElementById("processing-animation").style.display = "none";
-    alert("Beautification failed: " + error.message);
+    // 这里的 alert 在 JSON 错误那一步已经弹过一次，这里就不再重复
     throw error;
   }
 }
+
 
 
 // ========= 下载功能 =========
