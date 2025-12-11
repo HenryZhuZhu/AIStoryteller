@@ -415,12 +415,20 @@ async function loadFixedTemplatePDF() {
       }
 
       const blob = await response.blob();
-      beautifiedPdfBlob = blob;
+beautifiedPdfBlob = blob;
 
-      console.log("[API] 美化后的 PDF 下载完成，大小:", blob.size, "bytes");
+console.log("[API] 美化后的 PDF 下载完成，大小:", blob.size, "bytes");
 
-      const arrayBuffer = await blob.arrayBuffer();
-      return arrayBuffer;
+// ===== 调试输出：检查后端返回的文件格式 =====
+console.log("Blob type:", blob.type);
+
+const tmpBuffer = await blob.arrayBuffer();
+console.log("File magic bytes:", new Uint8Array(tmpBuffer).slice(0, 20));
+// =====（调试结束）=====
+
+const arrayBuffer = tmpBuffer;
+return arrayBuffer;
+
     })();
 
     // 3. 等待：动画 + PDF 下载 同时完成
@@ -590,6 +598,3 @@ async function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
-console.log("Blob type:", blob.type);
-const arrayBuffer = await blob.arrayBuffer();
-console.log("First bytes:", new Uint8Array(arrayBuffer).slice(0, 12));
